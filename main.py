@@ -86,6 +86,7 @@ class Ulaavi(QtWidgets.QWidget, mainUI.MainUI):
         self.settings.preferences_grp.on_reset.connect(self.__ops.on_reset_preferences)
         self.actions_ui.on_settings.connect(self.__ops.on_open_settings)
         self.settings.preferences_grp.on_apply.connect(self.__ops.on_apply_preferences)
+        self.settings.preferences_grp.on_reconnect.connect(self.__ops.on_reconnect_missing_media)
 
         # Thumbnail operations
         self.thumbnail.on_drop.connect(self.__ops.on_file_drop)

@@ -30,6 +30,7 @@ except ModuleNotFoundError:
 
 # -------------------------------- Custom Modules ------------------------------------
 from . import _preview_proxy
+from data import _media
 
 
 class ThumbnailOverlay(QtWidgets.QFrame):
@@ -151,7 +152,7 @@ class Thumbnails(QtWidgets.QFrame):
         self.thumbnail_overlay.label_left.setFont(font_)
         self.thumbnail_overlay.label_right.setFont(font_)
 
-    def set_metadata_overlay(self, metadata: dict, tags: List[str]) -> None:
+    def set_metadata_overlay(self, metadata: dict, tags: List[str], source: str = '') -> None:
         """
         Sets the metadata and tags to be displayed in the overlay.
 
@@ -159,9 +160,13 @@ class Thumbnails(QtWidgets.QFrame):
         :type metadata: dict
         :param tags: A list of tags associated with the thumbnail.
         :type tags: list[str]
+        :param source: Source file path, used to set the 'name' metadata after 'Tags'.
+        :type source: str
         """
         resolution = ''
         metadata['Tags'] = ','.join(tags) if tags else '-'
+        if source:
+            _media.set_name_metadata(metadata, source)
         width = metadata.get('width')
         height = metadata.get('height')
         if width and height:

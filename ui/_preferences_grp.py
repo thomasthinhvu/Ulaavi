@@ -173,6 +173,13 @@ class PreferencesGroup:
 
         self.horizontalLayout_preferences.addWidget(self.btn_reset)
 
+        self.btn_reconnect = QPushButton(self.frame_pref_actions)
+        self.btn_reconnect.setObjectName(u"btn_reconnect")
+        self.btn_reconnect.setMinimumSize(QSize(0, 24))
+        self.btn_reconnect.setMaximumSize(QSize(16777215, 24))
+
+        self.horizontalLayout_preferences.addWidget(self.btn_reconnect)
+
         self.btn_close = QPushButton(self.frame_pref_actions)
         self.btn_close.setObjectName(u"btn_close")
         self.btn_close.setMinimumSize(QSize(0, 24))
@@ -198,5 +205,6 @@ class PreferencesGroup:
         self.label_scale.setText("Thumbnail Scale")
         self.label_thread_count.setText("Thread Count")
         self.btn_apply.setText("Apply")
+        self.btn_reconnect.setText("Reconnect missing media")
         self.btn_reset.setText("Reset")
         self.btn_close.setText("Close")

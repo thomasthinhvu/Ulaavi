@@ -35,6 +35,7 @@ from typing import Generator, Dict, List
 
 # -------------------------------- Custom Modules ------------------------------------
 from . import _handler
+from . import _media
 
 
 class Data:
@@ -255,6 +256,25 @@ class Data:
         :rtype: bool
         """
         return self.data_obj.is_category_item_exists(group, category)
+
+    def reconnect_missing_media(self, search_root: str) -> dict:
+        """
+        Relink source and proxy files that no longer exist and save data.json.
+
+        :param search_root: Folder to search for the missing source files.
+        :type search_root: str
+        :return: Stats about the relink operation (see _media.reconnect_items).
+        :rtype: dict
+        """
+        raw = self.data_obj.deserialize()
+        source_index = _media.build_index(search_root)
+        proxy_index = _media.build_index(self.preferences.proxy)
+
+        stats = _media.reconnect_items(raw, source_index, proxy_index)
+        self.data_obj.serialize(raw)
+        self.refresh()
+
+        return stats
 
     def refresh(self) -> None:
         """

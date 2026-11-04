@@ -432,7 +432,7 @@ class ThumbnailUI(QTableWidget):
             else:
                 user_data['tags'].remove(tag)
             item.setData(Qt.UserRole, user_data)
-            widget.set_metadata_overlay(user_data['metadata'], user_data['tags'])
+            widget.set_metadata_overlay(user_data['metadata'], user_data['tags'], user_data.get('source', ''))
 
     def start_thread(self, runnable_object: QRunnable) -> None:
         """
@@ -573,7 +573,7 @@ class ThumbnailUI(QTableWidget):
 
         widget = self.cellWidget(*cell_position)
         widget.update_image_thumbnail(thumbnail_image)
-        widget.set_metadata_overlay(data['metadata'], data['tags'])
+        widget.set_metadata_overlay(data['metadata'], data['tags'], data.get('source', ''))
         item = self.item(*cell_position)
         item.setData(Qt.UserRole, data)
 

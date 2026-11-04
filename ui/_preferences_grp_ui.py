@@ -48,6 +48,7 @@ class Preferences(_preferences_grp.PreferencesGroup, QtWidgets.QWidget):
     """
     on_reset = QtCore.Signal()
     on_apply = QtCore.Signal(dict)
+    on_reconnect = QtCore.Signal(str)
 
     def __init__(self):
         """
@@ -83,6 +84,7 @@ class Preferences(_preferences_grp.PreferencesGroup, QtWidgets.QWidget):
         self.btn_apply.clicked.connect(self._apply_pref)
         self.btn_browse_proxy.clicked.connect(self._set_proxy_directory)
         self.btn_browse_json.clicked.connect(self._set_json_file_path)
+        self.btn_reconnect.clicked.connect(self._reconnect_media)
 
     def _reset_pref(self) -> None:
         """
@@ -120,6 +122,14 @@ class Preferences(_preferences_grp.PreferencesGroup, QtWidgets.QWidget):
         self.lineEdit_res_width.setText(data.get('res_width', ''))
         self.lineEdit_res_height.setText(data.get('res_height', ''))
         self.slider_thumbnail_scale.setValue(int(data.get('thumbnail', 1)))
+
+    def _reconnect_media(self) -> None:
+        """
+        Ask the user for a folder to search, then emit `on_reconnect` with that folder.
+        """
+        directory = self._browse_proxy_directory()
+        if directory:
+            self.on_reconnect.emit(directory)
 
     def _set_proxy_directory(self) -> None:
         """

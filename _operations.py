@@ -39,6 +39,7 @@ except ModuleNotFoundError:
 
 # -------------------------------- Custom Modules ------------------------------------
 from data import tool_data
+from data import _media
 import _utilities
 from conversion import convert_mov
 
@@ -344,6 +345,24 @@ class Operations:
         self.op_signals.on_reset_preferences.emit(self.data.preferences.default_values())
         self.op_signals.update_status.emit(f'Settings Panel: reset preferences, click "Apply" to save the changes.')
 
+    def on_reconnect_missing_media(self, search_root: str) -> None:
+        """
+        Relink missing source and proxy files by searching a folder, then reload the thumbnails.
+
+        :param search_root: Folder to search for the moved or missing footage.
+        :type search_root: str
+        """
+        stats = self.data.reconnect_missing_media(search_root)
+
+        for missing in stats['missing']:
+            print(f'[Ulaavi] Missing media, not found in {search_root}: {missing}')
+
+        self.op_signals.update_status.emit(
+            f"Reconnect: {stats['checked']} items, {stats['ok']} OK, "
+            f"{stats['relinked']} relinked, {stats['proxy_relinked']} proxy relinked, "
+            f"{len(stats['missing'])} still missing.")
+        self.op_signals.execute_startup.emit()
+
     def on_apply_preferences(self, data: dict) -> None:
         """
         Apply updated preferences.
@@ -507,6 +526,10 @@ class Operations:
         :param cell_position: The position of the cell in the UI.
         :type cell_position: tuple
         """
+        # 'Tags' goes first so that set_name_metadata places 'name' right after it
+        metadata.setdefault('Tags', '-')
+        _media.set_name_metadata(metadata, source_file)
+
         data = {'proxy': proxy_file, 'source': source_file, 'metadata': metadata, 'tags': []}
 
         if not hasattr(self, 'recache'):
