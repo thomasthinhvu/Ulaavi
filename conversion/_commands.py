@@ -5,6 +5,8 @@ This module provides utility functions for generating ffmpeg and ffprobe command
 tasks, such as video conversion, image sequence conversion, image conversion, and frame extraction.
 """
 
+from ._binaries import find_binary
+
 
 def convert_video(source_file: str,
                   output_file: str,
@@ -28,7 +30,7 @@ def convert_video(source_file: str,
     :return: A list of ffmpeg command arguments.
     :rtype: list[str]
     """
-    return ["ffmpeg",
+    return [find_binary("ffmpeg"),
             "-i",
             source_file,
             "-vcodec",
@@ -72,7 +74,7 @@ def convert_image_sequence(source_file: str,
     """
     _input = source_file.rsplit(' ', 1)[0]
 
-    return ["ffmpeg",
+    return [find_binary("ffmpeg"),
             "-start_number",
             start_frame,
             "-i",
@@ -105,7 +107,7 @@ def convert_image(source_file: str, output_file: str, resolutionX: int, resoluti
     :return: A list of ffmpeg command arguments.
     :rtype: list[str]
     """
-    return ["ffmpeg",
+    return [find_binary("ffmpeg"),
             "-i",
             source_file,
             "-vf",
@@ -124,7 +126,7 @@ def extract_video_thumbnail_frame(source_file: str) -> list:
     :return: A list of ffprobe command arguments.
     :rtype: list[str]
     """
-    return ["ffprobe",
+    return [find_binary("ffprobe"),
             "-loglevel",
             "0",
             "-print_format",
@@ -158,7 +160,7 @@ def extract_image_from_video(source_file: str,
     :return: A list of ffmpeg command arguments.
     :rtype: list[str]
     """
-    return ["ffmpeg",
+    return [find_binary("ffmpeg"),
             "-ss",
             f"{time}",
             "-i",

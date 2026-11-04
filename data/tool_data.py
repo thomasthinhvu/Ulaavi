@@ -285,11 +285,6 @@ class Data:
         raw = self.data_obj.deserialize()
         applied = _media.apply_changes(raw, plan['changes'])
 
-        # Switch the root only when writing, so new paths are stored as tokens.
-        if plan['search_root'] != self.preferences.footage_root:
-            self.preferences.update({'footage_root': plan['search_root']})
-            self.data_obj.footage_root = plan['search_root']
-
         self.data_obj.serialize(raw)
         self.refresh()
 

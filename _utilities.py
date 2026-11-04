@@ -290,8 +290,8 @@ def open_in_explorer(file_path: str) -> None:
     if sys.platform == "win32":
         subprocess.Popen(r'explorer /select, "{}"'.format(file_path.strip().replace("/", "\\")))
     if sys.platform == "darwin":
-        os.system("open '{}'".format(os.path.dirname(file_path)))
-    if sys.platform == "linux2":
+        os.system("open -R '{}'".format(file_path))
+    if sys.platform.startswith("linux"):
         os.system("xdg-open '{}'".format(os.path.dirname(file_path)))
 
 

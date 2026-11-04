@@ -13,6 +13,7 @@ import copy
 import datetime
 import os
 import shutil
+import sys
 from typing import Callable, Dict, List, Optional, Tuple
 
 NAME_KEY = 'name'
@@ -27,6 +28,15 @@ class ReconnectCancelled(Exception):
 def _normalize(path: str) -> str:
     """Return the path with forward slashes."""
     return path.replace('\\', '/')
+
+
+# Windows and macOS file systems are case-insensitive by default; Linux is not.
+CASE_SENSITIVE = sys.platform not in ('win32', 'darwin')
+
+
+def _key(name: str) -> str:
+    """Return the lookup key for a file name, following the OS rule for case."""
+    return name if CASE_SENSITIVE else name.lower()
 
 
 # ----------------------------------------------------------------------------
@@ -76,7 +86,7 @@ def build_index(root: str,
 
         for file_name in file_names:
             full_path = _normalize(os.path.join(dir_path, file_name))
-            index.setdefault(file_name.lower(), []).append(full_path)
+            index.setdefault(_key(file_name), []).append(full_path)
 
     return index
 
@@ -117,13 +127,13 @@ def _matches_metadata(metadata: dict, info: Dict[str, int]) -> bool:
 
 
 def _tail_score(candidate: str, old_path: str) -> int:
-    """Count how many trailing path parts two paths share (case-insensitive)."""
+    """Count how many trailing path parts two paths share (case rule follows the OS)."""
     new_parts = _normalize(candidate).split('/')[::-1]
     old_parts = _normalize(old_path).split('/')[::-1]
 
     score = 0
     for new_part, old_part in zip(new_parts, old_parts):
-        if new_part.lower() != old_part.lower():
+        if _key(new_part) != _key(old_part):
             break
         score += 1
     return score
@@ -186,7 +196,7 @@ def plan_reconnect(data: dict,
                 if source and os.path.exists(source):
                     stats['ok'] += 1
                 elif source:
-                    candidates = source_index.get(os.path.basename(_normalize(source)).lower(), [])
+                    candidates = source_index.get(_key(os.path.basename(_normalize(source))), [])
                     new_path = pick_candidate(candidates, source, metadata, probe_fn) if candidates else None
                     if new_path:
                         changes.append({'group': group, 'category': category, 'index': index,
@@ -199,7 +209,7 @@ def plan_reconnect(data: dict,
 
                 proxy = item.get('proxy', '')
                 if proxy and not os.path.exists(proxy) and proxy_index:
-                    candidates = proxy_index.get(os.path.basename(_normalize(proxy)).lower(), [])
+                    candidates = proxy_index.get(_key(os.path.basename(_normalize(proxy))), [])
                     if len(candidates) >= 1:
                         changes.append({'group': group, 'category': category, 'index': index,
                                         'field': 'proxy', 'old': proxy,

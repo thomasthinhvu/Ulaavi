@@ -115,7 +115,8 @@ class DataJson(JsonHandler):
         :param data: Data to serialize.
         :type data: Dict
         """
-        super().serialize(_media.collapse_footage_root(data, self.footage_root))
+        # Paths are written as absolute paths. Old '${FOOTAGE_ROOT}' tokens are expanded on read.
+        super().serialize(data)
 
     def deserialize(self) -> Dict:
         """
