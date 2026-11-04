@@ -58,7 +58,7 @@ class Data:
         Loads preferences and initializes the data object.
         """
         self.preferences = _handler.Preferences()
-        self.data_obj = _handler.DataJson(self.preferences.data_file)
+        self.data_obj = _handler.DataJson(self.preferences.data_file, self.preferences.footage_root)
         self.__data = self.data_obj.data
         self.__tags = self.data_obj.tags
 
@@ -257,24 +257,60 @@ class Data:
         """
         return self.data_obj.is_category_item_exists(group, category)
 
-    def reconnect_missing_media(self, search_root: str) -> dict:
+    def plan_reconnect(self, search_root: str, cancelled=None, progress=None) -> dict:
         """
-        Relink source and proxy files that no longer exist and save data.json.
+        Scan a folder for missing source and proxy files. Nothing is written.
 
-        :param search_root: Folder to search for the missing source files.
-        :type search_root: str
-        :return: Stats about the relink operation (see _media.reconnect_items).
-        :rtype: dict
+        :param search_root: Folder to search for the moved footage.
+        :param cancelled: Optional callable, returns True to stop the scan.
+        :param progress: Optional callable receiving status text.
+        :return: Plan dict with keys: changes, stats, search_root.
         """
         raw = self.data_obj.deserialize()
-        source_index = _media.build_index(search_root)
-        proxy_index = _media.build_index(self.preferences.proxy)
+        source_index = _media.build_index(search_root, cancelled, progress)
+        proxy_index = _media.build_index(self.preferences.proxy, cancelled, progress)
+        changes, stats = _media.plan_reconnect(raw, source_index, proxy_index, cancelled=cancelled)
+        return {'changes': changes, 'stats': stats, 'search_root': search_root}
 
-        stats = _media.reconnect_items(raw, source_index, proxy_index)
+    def apply_reconnect(self, plan: dict) -> dict:
+        """
+        Back up data.json, write the planned changes and make the search root the footage root.
+
+        :param plan: Plan from plan_reconnect (its 'changes' may be a filtered subset).
+        :return: Dict with keys: applied, backup.
+        """
+        backup = _media.backup_file(self.data_obj.json_file)
+
+        # Read and apply with the OLD root, so the paths match the plan.
+        raw = self.data_obj.deserialize()
+        applied = _media.apply_changes(raw, plan['changes'])
+
+        # Switch the root only when writing, so new paths are stored as tokens.
+        if plan['search_root'] != self.preferences.footage_root:
+            self.preferences.update({'footage_root': plan['search_root']})
+            self.data_obj.footage_root = plan['search_root']
+
         self.data_obj.serialize(raw)
         self.refresh()
 
-        return stats
+        return {'applied': applied, 'backup': backup}
+
+    def relink_source(self, group: str, category: str, old_source: str, new_source: str) -> bool:
+        """
+        Point one item's source to a new file, back up data.json, then save.
+
+        :return: True if the item was found and updated.
+        """
+        raw = self.data_obj.deserialize()
+        for item in raw['data'].get(group, {}).get(category, []):
+            if item.get('source') == old_source:
+                _media.backup_file(self.data_obj.json_file)
+                item['source'] = _media._normalize(new_source)
+                _media.set_name_metadata(item.setdefault('metadata', {}), item['source'])
+                self.data_obj.serialize(raw)
+                self.refresh()
+                return True
+        return False
 
     def refresh(self) -> None:
         """
@@ -283,5 +319,6 @@ class Data:
         Updates the internal data and tags after reloading from the JSON file.
         """
         self.data_obj.json_file = self.preferences.data_file
+        self.data_obj.footage_root = self.preferences.footage_root
         self.data_obj.refresh_data()
         self.__data = self.data_obj.data

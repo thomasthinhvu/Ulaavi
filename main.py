@@ -86,7 +86,13 @@ class Ulaavi(QtWidgets.QWidget, mainUI.MainUI):
         self.settings.preferences_grp.on_reset.connect(self.__ops.on_reset_preferences)
         self.actions_ui.on_settings.connect(self.__ops.on_open_settings)
         self.settings.preferences_grp.on_apply.connect(self.__ops.on_apply_preferences)
-        self.settings.preferences_grp.on_reconnect.connect(self.__ops.on_reconnect_missing_media)
+        self.settings.preferences_grp.on_reconnect_scan.connect(self.__ops.on_reconnect_scan)
+        self.settings.preferences_grp.on_reconnect_cancel.connect(self.__ops.on_reconnect_cancel)
+        self.settings.preferences_grp.on_reconnect_apply.connect(self.__ops.on_reconnect_apply)
+        self.__ops.op_signals.on_reconnect_progress.connect(self.settings.preferences_grp.update_reconnect_progress)
+        self.__ops.op_signals.on_reconnect_done.connect(self.settings.preferences_grp.show_reconnect_plan)
+        self.__ops.op_signals.on_recache_missing.connect(self.thumbnail.recache_missing_proxies)
+        self.thumbnail.on_relink_source.connect(self.__ops.on_relink_source)
 
         # Thumbnail operations
         self.thumbnail.on_drop.connect(self.__ops.on_file_drop)

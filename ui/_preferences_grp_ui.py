@@ -31,6 +31,7 @@ except ModuleNotFoundError:
 
 # -------------------------------- Custom Modules ------------------------------------
 from . import _preferences_grp
+from . import _reconnect_dialog
 from data import config
 
 
@@ -48,7 +49,9 @@ class Preferences(_preferences_grp.PreferencesGroup, QtWidgets.QWidget):
     """
     on_reset = QtCore.Signal()
     on_apply = QtCore.Signal(dict)
-    on_reconnect = QtCore.Signal(str)
+    on_reconnect_scan = QtCore.Signal(str)
+    on_reconnect_cancel = QtCore.Signal()
+    on_reconnect_apply = QtCore.Signal(dict)
 
     def __init__(self):
         """
@@ -125,11 +128,66 @@ class Preferences(_preferences_grp.PreferencesGroup, QtWidgets.QWidget):
 
     def _reconnect_media(self) -> None:
         """
-        Ask the user for a folder to search, then emit `on_reconnect` with that folder.
+        Ask for a folder to search, show a busy progress dialog, and start the scan.
         """
         directory = self._browse_proxy_directory()
-        if directory:
-            self.on_reconnect.emit(directory)
+        if not directory:
+            return
+
+        self._progress = QtWidgets.QProgressDialog('Scanning for missing media...', 'Cancel', 0, 0, self)
+        self._progress.setWindowTitle('Reconnect missing media')
+        self._progress.setWindowModality(QtCore.Qt.WindowModal)
+        self._progress.setAutoClose(False)
+        self._progress.setAutoReset(False)
+        self._progress.canceled.connect(self.on_reconnect_cancel.emit)
+        self._progress.show()
+
+        self.on_reconnect_scan.emit(directory)
+
+    def update_reconnect_progress(self, text: str) -> None:
+        """
+        Show the folder currently being scanned.
+
+        :param text: Status text from the scan worker.
+        :type text: str
+        """
+        progress = getattr(self, '_progress', None)
+        if progress is not None:
+            progress.setLabelText(text)
+
+    def show_reconnect_plan(self, plan: dict) -> None:
+        """
+        Close the progress dialog, then show the preview of planned changes.
+
+        Applying is only emitted when the user confirms the preview.
+
+        :param plan: Plan dict from the scan worker.
+        :type plan: dict
+        """
+        progress = getattr(self, '_progress', None)
+        if progress is not None:
+            progress.close()
+
+        if plan.get('error'):
+            QtWidgets.QMessageBox.critical(self, 'Reconnect missing media', f"Scan failed:\n{plan['error']}")
+            return
+
+        if plan.get('cancelled'):
+            QtWidgets.QMessageBox.information(self, 'Reconnect missing media', 'Scan cancelled. Nothing was changed.')
+            return
+
+        if not plan.get('changes'):
+            stats = plan.get('stats', {})
+            QtWidgets.QMessageBox.information(
+                self, 'Reconnect missing media',
+                f"No changes to apply.\nStill missing: {len(stats.get('missing', []))}\n"
+                f"Ambiguous (not changed): {len(stats.get('ambiguous', []))}")
+            return
+
+        dialog = _reconnect_dialog.ReconnectDialog(plan, self)
+        if dialog.exec() == QtWidgets.QDialog.Accepted:
+            self.on_reconnect_apply.emit({'search_root': plan['search_root'],
+                                          'changes': dialog.selected_changes()})
 
     def _set_proxy_directory(self) -> None:
         """

@@ -40,6 +40,7 @@ except ModuleNotFoundError:
 # -------------------------------- Custom Modules ------------------------------------
 from data import tool_data
 from data import _media
+import reconnect_worker
 import _utilities
 from conversion import convert_mov
 
@@ -120,6 +121,9 @@ class OpSignals(QObject):
     on_change_filters = Signal(list, object)
     on_delete_proxy = Signal()
     on_apply_preferences = Signal(int)
+    on_reconnect_progress = Signal(str)
+    on_reconnect_done = Signal(dict)
+    on_recache_missing = Signal()
 
 
 class Operations:
@@ -345,23 +349,55 @@ class Operations:
         self.op_signals.on_reset_preferences.emit(self.data.preferences.default_values())
         self.op_signals.update_status.emit(f'Settings Panel: reset preferences, click "Apply" to save the changes.')
 
-    def on_reconnect_missing_media(self, search_root: str) -> None:
+    def on_reconnect_scan(self, search_root: str) -> None:
         """
-        Relink missing source and proxy files by searching a folder, then reload the thumbnails.
+        Start a background scan for missing media in `search_root`.
 
-        :param search_root: Folder to search for the moved or missing footage.
+        Progress goes to on_reconnect_progress, the final plan to on_reconnect_done.
+
+        :param search_root: Folder to search.
         :type search_root: str
         """
-        stats = self.data.reconnect_missing_media(search_root)
+        self._reconnect_worker = reconnect_worker.start_scan(
+            self.data, search_root,
+            self.op_signals.on_reconnect_progress,
+            self.op_signals.on_reconnect_done)
 
-        for missing in stats['missing']:
-            print(f'[Ulaavi] Missing media, not found in {search_root}: {missing}')
+    def on_reconnect_cancel(self) -> None:
+        """Cancel the running scan, if any."""
+        worker = getattr(self, '_reconnect_worker', None)
+        if worker is not None:
+            worker.cancel()
+
+    def on_reconnect_apply(self, plan: dict) -> None:
+        """
+        Write the selected reconnect changes, then reload the grid and recache missing proxies.
+
+        :param plan: Plan dict from the scan, with 'changes' limited to the selected ones.
+        :type plan: dict
+        """
+        result = self.data.apply_reconnect(plan)
 
         self.op_signals.update_status.emit(
-            f"Reconnect: {stats['checked']} items, {stats['ok']} OK, "
-            f"{stats['relinked']} relinked, {stats['proxy_relinked']} proxy relinked, "
-            f"{len(stats['missing'])} still missing.")
+            f"Reconnect: applied {result['applied']} change(s). "
+            f"Backup: {result['backup']}")
         self.op_signals.execute_startup.emit()
+        self.op_signals.on_recache_missing.emit()
+
+    def on_relink_source(self, old_source: str, new_source: str, group: str, category: str) -> None:
+        """
+        Relink one item to a file picked by the user.
+
+        :param old_source: Current source path of the item.
+        :param new_source: File picked by the user.
+        :param group: Group name.
+        :param category: Category name.
+        """
+        if self.data.relink_source(group, category, old_source, new_source):
+            self.op_signals.update_status.emit(f'Relinked source: {new_source}')
+            self.op_signals.execute_startup.emit()
+        else:
+            self.op_signals.update_status.emit(f'Could not find item for: {old_source}')
 
     def on_apply_preferences(self, data: dict) -> None:
         """

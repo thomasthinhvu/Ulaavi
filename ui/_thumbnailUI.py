@@ -35,11 +35,11 @@ from functools import partial
 
 # ------------------------------- ThirdParty Modules ---------------------------------
 try:
-    from PySide2.QtWidgets import QTableWidget, QFrame, QMenu, QAction, QTableWidgetItem, QVBoxLayout, QWidget
+    from PySide2.QtWidgets import QTableWidget, QFrame, QMenu, QFileDialog, QAction, QTableWidgetItem, QVBoxLayout, QWidget
     from PySide2.QtCore import Signal, Qt, QMimeData, QThreadPool, QRunnable, QCoreApplication, QPoint
     from PySide2.QtGui import QIcon, QDrag
 except ModuleNotFoundError:
-    from PySide6.QtWidgets import QTableWidget, QFrame, QMenu, QTableWidgetItem, QVBoxLayout, QWidget
+    from PySide6.QtWidgets import QTableWidget, QFrame, QMenu, QFileDialog, QTableWidgetItem, QVBoxLayout, QWidget
     from PySide6.QtCore import Signal, Qt, QMimeData, QThreadPool, QRunnable, QCoreApplication, QPoint
     from PySide6.QtGui import QAction, QIcon, QDrag
 
@@ -119,6 +119,7 @@ class ThumbnailUI(QTableWidget):
     on_context_menu = Signal()
     on_open_in_explorer = Signal(str)
     on_recache_proxy = Signal(str, tuple, str, str)
+    on_relink_source = Signal(str, str, str, str)
     on_delete_proxy = Signal(str, str, list, set)
     on_create_tag = Signal(str)
     on_add_tag = Signal(str, str, list, str)
@@ -339,6 +340,11 @@ class ThumbnailUI(QTableWidget):
         open_in_explorer = menu.addAction(
             QIcon("{}/icons/explore.png".format(file_directory)), "Show in Explorer")
 
+        if len(self.selectedItems()) == 1:
+            locate_source = menu.addAction(QIcon("{}/icons/explore.png".format(file_directory)),
+                                           "Locate Source...")
+            locate_source.triggered.connect(self._locate_source)
+
         refresh_preview.triggered.connect(self._recache_proxy)
         delete_proxy.triggered.connect(self._delete_proxy)
         open_in_explorer.triggered.connect(self._open_in_explorer)
@@ -383,6 +389,38 @@ class ThumbnailUI(QTableWidget):
         selected_items = self.selectedItems()
         if 0 < len(selected_items) < 2:
             self.on_open_in_explorer.emit(selected_items[0].data(Qt.UserRole).get('source'))
+
+    def _locate_source(self) -> None:
+        """
+        Let the user pick a new file for the selected item's source.
+        """
+        items = self.selectedItems()
+        if len(items) != 1:
+            return
+
+        old_source = items[0].data(Qt.UserRole).get('source', '')
+        start_dir = os.path.dirname(old_source) if old_source else ''
+        new_source, _ = QFileDialog.getOpenFileName(self, 'Locate source', start_dir)
+        if new_source:
+            self.on_relink_source.emit(old_source, new_source.replace('\\', '/'),
+                                       self.current_group, self.current_category)
+
+    def recache_missing_proxies(self) -> None:
+        """
+        Recache the proxy of every item whose source exists but whose proxy is missing.
+        """
+        for row in range(self.rowCount()):
+            for column in range(self.columnCount()):
+                item = self.item(row, column)
+                user_data = item.data(Qt.UserRole) if item else None
+                if not user_data:
+                    continue
+
+                source = user_data.get('source', '')
+                proxy = user_data.get('proxy', '')
+                if source and os.path.exists(source) and not (proxy and os.path.exists(proxy)):
+                    self.on_recache_proxy.emit(source, (row, column),
+                                               self.current_group, self.current_category)
 
     def _recache_proxy(self) -> None:
         """

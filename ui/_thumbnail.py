@@ -190,6 +190,9 @@ class Thumbnails(QtWidgets.QFrame):
                 meta_string_right += '\n'
                 meta_string_right += f'{key}: {value}'
 
+        if source and not os.path.exists(source):
+            meta_string_left = 'MISSING SOURCE' + meta_string_left
+
         self.thumbnail_overlay.label_left.setText(meta_string_left)
         self.thumbnail_overlay.label_right.setText(meta_string_right)
 

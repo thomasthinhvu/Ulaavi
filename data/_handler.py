@@ -31,6 +31,7 @@ from typing import Dict, Optional, List, Union
 # -------------------------------- Custom Modules ------------------------------------
 import _utilities
 from data import config
+from data import _media
 
 
 class JsonHandler(ABC):
@@ -92,17 +93,38 @@ class DataJson(JsonHandler):
         __data (Dict): Internal data structure for storing JSON data.
     """
 
-    def __init__(self, json_file: str) -> None:
+    def __init__(self, json_file: str, footage_root: str = '') -> None:
         """
         Initialize the DataJson handler.
 
         :param json_file: Path to the JSON file.
         :type json_file: str
+        :param footage_root: Real footage root. '${FOOTAGE_ROOT}' in data.json maps to this folder.
+        :type footage_root: str
         """
+        self.footage_root = footage_root
         super().__init__(json_file)
 
         self.create_default_json()
         self.__data = self.deserialize()
+
+    def serialize(self, data: Dict) -> None:
+        """
+        Write data to the JSON file, storing footage paths under the footage root as tokens.
+
+        :param data: Data to serialize.
+        :type data: Dict
+        """
+        super().serialize(_media.collapse_footage_root(data, self.footage_root))
+
+    def deserialize(self) -> Dict:
+        """
+        Read data from the JSON file, expanding footage root tokens to real paths.
+
+        :return: Deserialized data.
+        :rtype: Dict
+        """
+        return _media.expand_footage_root(super().deserialize(), self.footage_root)
 
     def create_default_json(self) -> None:
         """
@@ -338,7 +360,8 @@ class Preferences:
                  'thread_count',
                  'res_width',
                  'res_height',
-                 'thumbnail')
+                 'thumbnail',
+                 'footage_root')
 
     def __init__(self):
         """
@@ -357,6 +380,7 @@ class Preferences:
         self.res_width = None
         self.res_height = None
         self.thumbnail = None
+        self.footage_root = None
 
         self._update_attributes()
 
@@ -378,6 +402,7 @@ class Preferences:
         self.res_width = int(preferences.get('res_width'))
         self.res_height = int(preferences.get('res_height'))
         self.thumbnail = int(preferences.get('thumbnail'))
+        self.footage_root = preferences.get('footage_root') or ''
 
     def preferences(self) -> Dict[str, str]:
         """
@@ -391,7 +416,8 @@ class Preferences:
                 'thread_count': str(self.thread_count),
                 'res_width': str(self.res_width),
                 'res_height': str(self.res_height),
-                'thumbnail': self.thumbnail}
+                'thumbnail': self.thumbnail,
+                'footage_root': self.footage_root}
 
     def update(self, data: Dict[str, str]) -> None:
         """
@@ -444,7 +470,8 @@ class Preferences:
                 'thread_count': '4',
                 'res_width': '520',
                 'res_height': '300',
-                'thumbnail': '1'}
+                'thumbnail': '1',
+                'footage_root': ''}
 
     def _write_preferences(self) -> None:
         """
