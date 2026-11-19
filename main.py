@@ -81,6 +81,8 @@ class Ulaavi(QtWidgets.QWidget, mainUI.MainUI):
         self.categories.tree.on_create.connect(self.__ops.on_create_category)
         self.categories.tree.on_remove.connect(self.__ops.on_delete)
         self.categories.tree.on_rename.connect(self.__ops.on_rename_category)
+        self.categories.tree.on_folder_drop.connect(
+            lambda folder: self.__ops.on_folder_drop(self.categories.group.current_group, folder))
 
         # Settings and preferences
         self.settings.preferences_grp.on_reset.connect(self.__ops.on_reset_preferences)

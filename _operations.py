@@ -38,6 +38,7 @@ except ModuleNotFoundError:
     from PySide6.QtCore import QObject, Signal, QRunnable
 
 # -------------------------------- Custom Modules ------------------------------------
+from data import config
 from data import tool_data
 from data import _media
 import reconnect_worker
@@ -434,6 +435,71 @@ class Operations:
 
         self.op_signals.on_files_dropped.emit(data)
 
+    def on_folder_drop(self, group: str, folder_path: str) -> None:
+        """
+        Mirror a dropped folder as categories under 'root' and scan the media inside it.
+
+        Each folder becomes a category ('root|<folder>|<sub>|...'), the same way subfolders
+        appear in Explorer. Media files directly inside each folder (and image sequences
+        whose frames live in that folder) get proxies created for their own category.
+
+        :param group: The group name the folder is dropped into.
+        :type group: str
+        :param folder_path: The dropped folder path.
+        :type folder_path: str
+        """
+        if not group:
+            self.op_signals.update_status.emit('Select a group before dropping a folder.')
+            return
+
+        root_name = os.path.basename(os.path.normpath(folder_path))
+        if not root_name:
+            return
+
+        # (directory, category) pairs, parents first so nested categories always have a parent
+        folder_map = []
+        for current_dir, _, _ in os.walk(folder_path):
+            rel = os.path.relpath(current_dir, folder_path)
+            parts = [] if rel == '.' else rel.split(os.sep)
+            folder_map.append((current_dir, '|'.join(['root', root_name] + parts)))
+        folder_map.sort(key=lambda item: item[1].count('|'))
+
+        existing = set(self.data.categories(group))
+        for _, category in folder_map:
+            if category not in existing:
+                self.data.add_category(group, category)
+                existing.add(category)
+
+        proxy_count = 0
+        for current_dir, category in folder_map:
+            queued = []
+            for file_name in sorted(os.listdir(current_dir)):
+                file_path = os.path.join(current_dir, file_name)
+                if os.path.isfile(file_path) and file_name.lower().endswith(
+                        config.SUPPORTED_IMAGE_FORMATS + config.SUPPORTED_VIDEO_FORMATS):
+                    queued.extend(_utilities.get_dropped_files_with_proxy_path(
+                        file_path=file_path,
+                        proxy_root_path=self.data.preferences.proxy,
+                        group=group,
+                        category=category))
+
+            # image sequences whose frames sit directly in this folder (flag is True for sequences)
+            queued.extend(entry for entry in _utilities.get_dropped_files_with_proxy_path(
+                file_path=current_dir,
+                proxy_root_path=self.data.preferences.proxy,
+                group=group,
+                category=category) if isinstance(entry, tuple) and len(entry) == 3 and entry[2])
+
+            for source_file, proxy_file, is_image_seq in queued:
+                if os.path.isfile(proxy_file):
+                    continue
+                self.convert_to_mov(source_file, proxy_file, is_image_seq, None, group, category)
+                proxy_count += 1
+
+        self.op_signals.on_load_categories.emit(tuple(self.data.categories(group)))
+        self.op_signals.update_status.emit(
+            f'Imported folder: {folder_path} ({len(folder_map)} categories, {proxy_count} proxies queued)')
+
     def on_recache_proxy(self, file_url: str, cell_position: Tuple[int, int], group: str, category: str) -> None:
         """
         Recache a proxy file.
@@ -573,7 +639,9 @@ class Operations:
         else:
             delattr(self, 'recache')
 
-        self.op_signals.on_render_completed.emit(data, proxy_thumbnail, cell_position)
+        # cell_position is None for folder imports: the grid shows another category, so only data is updated
+        if cell_position is not None:
+            self.op_signals.on_render_completed.emit(data, proxy_thumbnail, cell_position)
         self.op_signals.update_status.emit(f'Created  Proxy File: {proxy_file}')
 
     def on_render_error(self, data: str) -> None:

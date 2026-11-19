@@ -27,6 +27,7 @@ Example Use Cases:
 """
 
 # -------------------------------- built-in Modules ----------------------------------
+import os
 import re
 from typing import Optional, List, Tuple
 
@@ -115,12 +116,14 @@ class CategoriesTree(QtWidgets.QTreeWidget):
         on_remove (str, str): Emitted when a category is removed.
         on_change (str, str): Emitted when the current category changes.
         on_rename (str, str, str): Emitted when a category is renamed.
+        on_folder_drop (str): Emitted when a folder is dropped onto the root item. Carries the folder path.
     """
 
     on_create = QtCore.Signal(str, str)
     on_remove = QtCore.Signal(str, str)
     on_change = QtCore.Signal(str, str)
     on_rename = QtCore.Signal(str, str, str)
+    on_folder_drop = QtCore.Signal(str)
 
     def __init__(self, parent=None) -> None:
         """
@@ -153,6 +156,7 @@ class CategoriesTree(QtWidgets.QTreeWidget):
         self.header().setDefaultSectionSize(50)
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._context_menu)
+        self.setAcceptDrops(True)
 
     def _widget_connections(self) -> None:
         """
@@ -171,6 +175,58 @@ class CategoriesTree(QtWidgets.QTreeWidget):
         self.addTopLevelItem(root)
         self.expandItem(root)
         self.setCurrentItem(root)
+
+    def _is_root_drop_target(self, position) -> bool:
+        """
+        Check whether a drag position is over the root item.
+
+        :param position: The position in widget coordinates.
+        :return: True if the position is over the root item.
+        :rtype: bool
+        """
+        return self.itemAt(position) is self.__root_tree_item
+
+    def dragEnterEvent(self, event) -> None:
+        """
+        Accept drag operations that carry URLs (files or folders).
+
+        :param event: The drag enter event.
+        :type event: QDragEnterEvent
+        """
+        if event.mimeData().hasUrls():
+            event.accept()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event) -> None:
+        """
+        Only accept the drag while the pointer is over the root item.
+
+        :param event: The drag move event.
+        :type event: QDragMoveEvent
+        """
+        if event.mimeData().hasUrls() and self._is_root_drop_target(event.pos()):
+            event.accept()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event) -> None:
+        """
+        Emit `on_folder_drop` for each folder dropped onto the root item.
+
+        :param event: The drop event.
+        :type event: QDropEvent
+        """
+        if not self._is_root_drop_target(event.pos()):
+            event.ignore()
+            return
+
+        for url_ in event.mimeData().urls():
+            path = url_.toLocalFile()
+            if os.path.isdir(path):
+                self.on_folder_drop.emit(path)
+
+        event.accept()
 
     def _context_menu(self, position) -> None:
         """

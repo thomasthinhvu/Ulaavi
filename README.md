@@ -62,6 +62,10 @@ Ulaavi is a tool designed to help you load, preview, and import stock footage di
 ### Platforms
 * Tested in Windows (may work in Linux & Mac)
 
+### My Modification update
+* [26-11-19]
+  * **Folder drag & drop:** Drop a folder onto the `root` item in the left tree to create a matching category tree (the folder becomes a main category, its subfolders become nested sub categories, like Explorer), then scan and create proxies for the media inside each folder.
+
 ### What's Changed
 * GIF previews have been replaced with .mov for better quality previews.
 * Added basic and essential metadata preview over thumbnails.
